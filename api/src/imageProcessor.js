@@ -1,5 +1,5 @@
 const { resolve } = require('path');
-const { isMainThread } = require('worker_threads');
+const { isMainThread, Worker } = require('worker_threads');
 const pathToResizeWorker = resolve(__dirname, 'resizeWorker.js');
 const pathToMonochromeWorker = resolve(__dirname, 'monochromeWorker.js');
 
@@ -18,21 +18,26 @@ function imageProcessor(filename) {
       reject(new Error('not on main thread'));
     } else {
       try {
-        const monochromeWorker = new Worker(pathToMonochromeWorker, {
-          workerData: { source: sourcePath, destination: resizeDestination },
-        });
         const resizeWorker = new Worker(pathToResizeWorker, {
+          workerData: {
+            source: sourcePath,
+            destination: resizeDestination,
+          },
+        });
+        const monochromeWorker = new Worker(pathToMonochromeWorker, {
           workerData: {
             source: sourcePath,
             destination: monochromeDestination,
           },
         });
+
         monochromeWorker.on('message', (message) => {
           monochromeWorkerFinished = true;
-          resolve('monochromeWorker finished processing');
+          if (resizeWorkerFinished) {
+            resolve('monochromeWorker finished processing');
+          }
         });
         monochromeWorker.on('error', (error) => {
-          resizeWorkerFinished = true;
           reject(new Error(error.message));
         });
         monochromeWorker.on('exit', (code) => {
@@ -43,10 +48,11 @@ function imageProcessor(filename) {
 
         resizeWorker.on('message', (message) => {
           resizeWorkerFinished = true;
-          resolve('resizeWorker finished processing');
+          if (monochromeWorkerFinished) {
+            resolve('resizeWorker finished processing');
+          }
         });
         resizeWorker.on('error', (error) => {
-          resizeWorkerFinished = true;
           reject(new Error(error.message));
         });
         resizeWorker.on('exit', (code) => {

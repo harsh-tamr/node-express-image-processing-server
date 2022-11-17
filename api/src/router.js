@@ -25,14 +25,15 @@ function fileFilter(request, file, callback) {
 
 const upload = multer({ fileFilter, storage });
 
-router.post('/upload', upload.single('photo'), async (req, res) => {
-  if (req.fileValidationError) {
-    return res.status(400).json({ error: req.fileValidationError });
-  }
+router.post('/upload', upload.single('photo'), async (request, response) => {
+  if (request.fileValidationError)
+    return response.status(400).json({ error: request.fileValidationError });
+
   try {
-    await imageProcessor(req.file.filename);
+    await imageProcessor(request.file.filename);
   } catch (error) {}
-  return res.status(201).json({ success: 'true' });
+
+  return response.status(201).json({ success: true });
 });
 
 router.get('/photo-viewer', (req, res) => {
